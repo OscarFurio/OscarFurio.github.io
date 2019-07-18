@@ -53,6 +53,7 @@ body {
 
 .column {
   min-width: 300px;
+  max-width: 500px;
   display: inline-block;
   vertical-align: top;
 }
@@ -61,6 +62,10 @@ body {
   color: white;
   text-transform:  uppercase;
   letter-spacing: 0.1em;
+}
+
+#footer a {
+  vertical-align: middle;
 }
 
 #footer p {
@@ -81,10 +86,15 @@ a:hover {
 }
 
 
-img {
-    max-width: 20%;
-    height: auto;
-    width: auto/99;
+.post-author img {
+    max-width: 100%;
+    height: 100px;
+    width: 100px;
+}
+
+.column img {
+  max-width: 6%;
+  vertical-align: middle;
 }
 
 .post-author span {
@@ -103,6 +113,7 @@ img {
 h1, h2, h3, h4 {
   color: #333;
 }
+
 p {
-  line-height: 1.5;
+  line-height: 1;
 }
