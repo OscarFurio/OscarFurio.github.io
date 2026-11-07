@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Código QR · Descubre Carranque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilos.css">
+  <style>
+    .qr-pagina { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+    .controles { display: grid; gap: 12px; margin-bottom: 24px; }
+    .controles input { width: 100%; height: 54px; padding: 0 16px; font: inherit; border: 2px solid var(--borde); border-radius: 12px; }
+    .controles .fila { display: flex; flex-wrap: wrap; gap: 10px; }
+    .cartel {
+      background: #fff; border: 1px solid var(--borde); border-radius: 24px; padding: 40px 32px;
+      text-align: center; box-shadow: var(--sombra);
+    }
+    .cartel h1 { margin: 0; color: var(--acento); font-size: 46px; line-height: 1.05; }
+    .cartel .lema { font-size: 22px; margin: 10px 0 24px; color: var(--texto-suave); }
+    #qr { display: inline-block; padding: 16px; background: #fff; border: 6px solid var(--acento); border-radius: 20px; }
+    #qr img, #qr canvas { display: block; width: 320px !important; height: 320px !important; max-width: 62vw; max-height: 62vw; }
+    .cartel .instruccion { font-size: 22px; font-weight: 700; margin: 24px 0 6px; }
+    .cartel .url { font-size: 16px; color: var(--texto-suave); word-break: break-all; }
+    @media print {
+      body { background: #fff; }
+      .controles, .no-imprimir { display: none !important; }
+      .qr-pagina { padding: 0; }
+      .cartel { box-shadow: none; border: 0; padding-top: 60px; }
+      .cartel h1 { font-size: 64px; }
+      #qr img, #qr canvas { width: 440px !important; height: 440px !important; max-width: none; max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="qr-pagina">
+    <p class="no-imprimir"><a class="btn" href="./">← Volver al mapa</a></p>
+
+    <div class="controles">
+      <label for="url"><strong>Dirección que abrirá el QR</strong> (no la cambies una vez impreso)</label>
+      <input id="url" type="url">
+      <div class="fila">
+        <button type="button" class="btn btn-primario" id="descargar">⬇️ Descargar QR (PNG)</button>
+        <button type="button" class="btn" onclick="window.print()">🖨️ Imprimir cartel</button>
+      </div>
+    </div>
+
+    <div class="cartel">
+      <h1>📍 Descubre Carranque</h1>
+      <p class="lema">Comercios, asociaciones y cultura de tu pueblo</p>
+      <div id="qr" role="img" aria-label="Código QR"></div>
+      <p class="instruccion">Escanea con la cámara del móvil</p>
+      <p class="url" id="url-texto"></p>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="js/config.js"></script>
+  <script>
+    (function () {
+      var input = document.getElementById("url");
+      var cont = document.getElementById("qr");
+      input.value = window.CONFIG.urlPublica;
+      var qr = null;
+      function generar() {
+        cont.innerHTML = "";
+        qr = new QRCode(cont, {
+          text: input.value.trim() || window.CONFIG.urlPublica,
+          width: 1024, height: 1024,
+          colorDark: "#1f2328", colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+        document.getElementById("url-texto").textContent = input.value.trim();
+      }
+      input.addEventListener("input", generar);
+      document.getElementById("descargar").addEventListener("click", function () {
+        var canvas = cont.querySelector("canvas");
+        var a = document.createElement("a");
+        a.download = "qr-descubre-carranque.png";
+        a.href = canvas.toDataURL("image/png");
+        a.click();
+      });
+      generar();
+    })();
+  </script>
+</body>
+</html>
