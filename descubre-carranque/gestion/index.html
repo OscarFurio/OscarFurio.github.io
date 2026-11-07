@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Gestión · Descubre Carranque</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="../css/estilos.css">
+  <link rel="stylesheet" href="gestion.css">
+</head>
+<body class="gestion">
+
+  <header class="g-cabecera">
+    <div class="g-cabecera-inner">
+      <div>
+        <h1 class="titulo g-titulo">Descubre Carranque</h1>
+        <p class="subtitulo">Zona de gestión</p>
+      </div>
+      <div class="g-usuario" id="g-usuario" hidden>
+        <span id="g-email"></span>
+        <button type="button" class="btn btn-peq" id="btn-clave">🔑 Cambiar contraseña</button>
+        <button type="button" class="btn btn-peq" id="btn-salir">Salir</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="g-principal">
+
+    <!-- Aviso: falta configurar Supabase -->
+    <section class="g-caja" id="vista-sin-config" hidden>
+      <h2>Falta conectar la base de datos</h2>
+      <p>Para usar la zona de gestión hay que rellenar <code>supabaseUrl</code> y <code>supabaseAnonKey</code> en el archivo <code>js/config.js</code>.</p>
+      <p>Los pasos están en el archivo <code>README.md</code>, en el apartado <strong>«Zona de gestión (Supabase)»</strong>.</p>
+    </section>
+
+    <!-- Inicio de sesión -->
+    <section class="g-caja g-login" id="vista-login" hidden>
+      <h2>Entrar</h2>
+      <form id="form-login" novalidate>
+        <label class="campo">
+          <span>Email</span>
+          <input type="email" id="login-email" autocomplete="username" required>
+        </label>
+        <label class="campo">
+          <span>Contraseña</span>
+          <input type="password" id="login-clave" autocomplete="current-password" required>
+        </label>
+        <p class="g-error" id="login-error" role="alert" hidden></p>
+        <button type="submit" class="btn btn-primario btn-ancho" id="login-boton">Entrar</button>
+      </form>
+      <p class="nota">¿No tienes acceso? Pídeselo a la persona que administra la web.</p>
+    </section>
+
+    <!-- Sin permisos -->
+    <section class="g-caja" id="vista-sin-permiso" hidden>
+      <h2>Tu usuario no tiene permiso</h2>
+      <p>Has entrado correctamente, pero tu email no está en la lista de gestores. Pide al administrador que te añada.</p>
+    </section>
+
+    <!-- Lista de lugares -->
+    <section id="vista-lista" hidden>
+      <div class="g-barra">
+        <input type="search" id="lista-buscar" class="g-buscar" placeholder="Buscar por nombre…" aria-label="Buscar">
+        <select id="lista-seccion" aria-label="Sección">
+          <option value="">Todas las secciones</option>
+        </select>
+        <button type="button" class="btn btn-primario" id="btn-nuevo">➕ Añadir lugar</button>
+      </div>
+      <p class="contador" id="lista-contador"></p>
+      <ul class="g-lista" id="g-lista"></ul>
+    </section>
+
+    <!-- Formulario -->
+    <form id="vista-form" class="g-form" hidden novalidate>
+      <div class="g-form-cabecera">
+        <button type="button" class="btn" data-accion="volver">← Volver a la lista</button>
+        <h2 id="form-titulo">Nuevo lugar</h2>
+      </div>
+
+      <fieldset>
+        <legend>1 · Datos básicos</legend>
+        <label class="campo">
+          <span>Nombre <b class="obl">*</b></span>
+          <input type="text" name="nombre" required maxlength="80" placeholder="Ej.: Panadería La Espiga">
+        </label>
+        <div class="fila-2">
+          <label class="campo">
+            <span>Sección <b class="obl">*</b></span>
+            <select name="seccion" required></select>
+          </label>
+          <label class="campo">
+            <span>Categoría <b class="obl">*</b></span>
+            <select name="categoria" required></select>
+          </label>
+        </div>
+        <label class="campo">
+          <span>Icono propio en el mapa <small>(opcional, un emoji; si se deja vacío se usa el de la categoría)</small></span>
+          <div class="icono-fila">
+            <input type="text" name="icono" maxlength="8" class="input-icono" placeholder="🥖">
+            <span class="icono-sugerencias" id="icono-sugerencias"></span>
+          </div>
+        </label>
+        <label class="check">
+          <input type="checkbox" name="publicado" checked>
+          <span><strong>Visible en la web</strong> <small>(desmárcalo para guardarlo como borrador)</small></span>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>2 · Presentación</legend>
+        <label class="campo">
+          <span>Frase corta <b class="obl">*</b> <small>(sale en la tarjeta al pasar el ratón)</small></span>
+          <input type="text" name="resumen" required maxlength="120" placeholder="Ej.: Pan artesano de horno de leña y dulces típicos.">
+          <small class="contador-car" data-para="resumen"></small>
+        </label>
+        <label class="campo">
+          <span>Descripción <small>(sale en la ficha completa; deja una línea en blanco para separar párrafos)</small></span>
+          <textarea name="descripcion" rows="6" maxlength="2000"></textarea>
+        </label>
+        <label class="campo">
+          <span>Qué ofrecemos <small>(uno por línea)</small></span>
+          <textarea name="servicios" rows="4" placeholder="Encargos para celebraciones&#10;Productos sin gluten"></textarea>
+        </label>
+        <label class="campo">
+          <span>Palabras de búsqueda <small>(separadas por comas; ayudan a que el buscador lo encuentre)</small></span>
+          <input type="text" name="etiquetas" placeholder="pan, dulces, tartas">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>3 · Fotos</legend>
+        <p class="nota">La primera foto es la principal (sale en la tarjeta). Se reducen de tamaño automáticamente. Máximo 6.</p>
+        <div class="fotos" id="fotos"></div>
+        <label class="btn subir-fotos" id="btn-subir">
+          📷 Añadir fotos
+          <input type="file" id="input-fotos" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        </label>
+        <p class="nota" id="fotos-estado" aria-live="polite"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>4 · Ubicación</legend>
+        <label class="campo">
+          <span>Dirección <b class="obl">*</b></span>
+          <input type="text" name="direccion" required maxlength="150" placeholder="Calle Real, 3 · 45216 Carranque">
+        </label>
+        <div class="ubic-acciones">
+          <button type="button" class="btn btn-peq" id="btn-geocodificar">🔎 Buscar la dirección en el mapa</button>
+          <label class="campo campo-inline">
+            <span>o pega coordenadas de Google Maps</span>
+            <input type="text" id="coords-pegar" placeholder="40.1701, -3.9022">
+          </label>
+        </div>
+        <p class="nota"><strong>Toca o haz clic en el mapa</strong> para colocar el punto exacto del local. También puedes arrastrar la chincheta.</p>
+        <div class="mapa-form" id="mapa-form"></div>
+        <p class="nota" id="coords-texto"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>5 · Horario</legend>
+        <div class="horario-form" id="horario-form"></div>
+        <div class="horario-acciones">
+          <button type="button" class="btn btn-peq" id="btn-copiar-lunes">Copiar el lunes de martes a viernes</button>
+          <button type="button" class="btn btn-peq" id="btn-24h">Abierto 24 horas todos los días</button>
+        </div>
+        <label class="campo">
+          <span>Observaciones del horario <small>(vacaciones, festivos, cita previa…)</small></span>
+          <input type="text" name="horarioNota" maxlength="150">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>6 · Contacto</legend>
+        <div class="fila-2">
+          <label class="campo"><span>Teléfono</span><input type="tel" name="telefono" placeholder="925 000 000"></label>
+          <label class="campo"><span>WhatsApp</span><input type="tel" name="whatsapp" placeholder="600 000 000"></label>
+        </div>
+        <div class="fila-2">
+          <label class="campo"><span>Email</span><input type="email" name="email"></label>
+          <label class="campo"><span>Página web</span><input type="url" name="web" placeholder="https://…"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>7 · Redes sociales <small>(pega el enlace completo)</small></legend>
+        <div class="fila-2">
+          <label class="campo"><span>📸 Instagram</span><input type="url" name="red-instagram" placeholder="https://www.instagram.com/…"></label>
+          <label class="campo"><span>👍 Facebook</span><input type="url" name="red-facebook" placeholder="https://www.facebook.com/…"></label>
+        </div>
+        <div class="fila-2">
+          <label class="campo"><span>🎵 TikTok</span><input type="url" name="red-tiktok" placeholder="https://www.tiktok.com/@…"></label>
+          <label class="campo"><span>▶️ YouTube</span><input type="url" name="red-youtube" placeholder="https://www.youtube.com/…"></label>
+        </div>
+        <label class="campo"><span>✖️ X (Twitter)</span><input type="url" name="red-x" placeholder="https://x.com/…"></label>
+      </fieldset>
+
+      <p class="g-error" id="form-error" role="alert" hidden></p>
+
+      <div class="g-form-pie">
+        <button type="button" class="btn btn-peligro" data-accion="eliminar" id="btn-eliminar" hidden>🗑️ Eliminar</button>
+        <span class="espacio"></span>
+        <button type="button" class="btn" data-accion="volver">Cancelar</button>
+        <button type="submit" class="btn btn-primario" id="btn-guardar">💾 Guardar</button>
+      </div>
+    </form>
+  </main>
+
+  <div class="g-aviso" id="g-aviso" role="status" hidden></div>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/estilo-mapa.js"></script>
+  <script src="../js/datos.js"></script>
+  <script src="../js/fuente-datos.js"></script>
+  <script src="gestion.js"></script>
+</body>
+</html>
