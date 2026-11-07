@@ -125,4 +125,8 @@ Firma y fecha:
 
 ## Tecnología
 
-Es una web estática sin servidor ni base de datos, que se publica gratis en GitHub Pages. El mapa usa [Leaflet](https://leafletjs.com/) con datos de © OpenStreetMap y el estilo de mapa de © CARTO. El QR se genera con qrcodejs y la tipografía es Atkinson Hyperlegible, diseñada para leerse con facilidad.
+Es una web estática sin servidor ni base de datos, que se publica gratis en GitHub Pages.
+
+- **Mapa:** [MapLibre GL](https://maplibre.org/) con teselas vectoriales de [OpenFreeMap](https://openfreemap.org/) (gratuito y sin clave), con datos de © OpenStreetMap. El estilo es propio y minimalista: sin edificios, calles color hueso con el nombre visible, parques en verde y fondo azul bebé. **Los colores se cambian en `js/estilo-mapa.js`**, al principio del archivo.
+- **Tipografías:** Fraunces, una serifa redondeada de estilo «Times», para el título en mayúsculas, y Atkinson Hyperlegible, diseñada para leerse con facilidad, para los textos.
+- **QR:** qrcodejs.

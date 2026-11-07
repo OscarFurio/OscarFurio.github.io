@@ -19,7 +19,7 @@
   var conRaton = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
   var estado = { seccion: "todo", categoria: null, texto: "" };
-  var marcadores = {};   // id -> L.Marker
+  var marcadores = {};   // id -> marcador del mapa
   var elemLista = {};    // id -> botón de la lista
   var activo = null;
 
@@ -102,54 +102,119 @@
   }
 
   /* ---------- Mapa ---------- */
-  var mapa = L.map("mapa", { zoomControl: true, tap: true }).setView(CFG.centroMapa, CFG.zoomInicial);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    maxZoom: 20, subdomains: "abcd",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  }).addTo(mapa);
-  var capa = L.layerGroup().addTo(mapa);
+  // MapLibre usa [longitud, latitud]; en datos.js las coordenadas van como [latitud, longitud]
+  function ll(c) { return [c[1], c[0]]; }
+  var mapa = new maplibregl.Map({
+    container: "mapa",
+    style: window.ESTILO_MAPA,
+    center: ll(CFG.centroMapa),
+    zoom: CFG.zoomInicial - 1,
+    minZoom: 11, maxZoom: 19,
+    pitchWithRotate: false, dragRotate: false, touchPitch: false,
+    attributionControl: false
+  });
+  mapa.touchZoomRotate.disableRotation();
+  mapa.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-left");
+  mapa.addControl(new maplibregl.AttributionControl({
+    compact: true,
+    customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> · &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+  }), "bottom-left");
+
+  var popupAbierto = null;
+  var ajustando = false;   // mientras el mapa se desplaza para mostrar la tarjeta, no se cierra
+
+  // Si la tarjeta no cabe entera, desplaza el mapa lo justo para que se vea completa
+  function asegurarVisible(popup) {
+    var pe = popup.getElement();
+    if (!pe) return;
+    var m = mapa.getContainer().getBoundingClientRect();
+    var r = pe.getBoundingClientRect();
+    var margen = 12, dx = 0, dy = 0;
+    if (r.top < m.top + margen) dy = r.top - m.top - margen;
+    else if (r.bottom > m.bottom - margen) dy = r.bottom - m.bottom + margen;
+    if (r.left < m.left + margen) dx = r.left - m.left - margen;
+    else if (r.right > m.right - margen) dx = r.right - m.right + margen;
+    if (dx || dy) {
+      ajustando = true;
+      mapa.panBy([dx, dy], { duration: 350 });
+      mapa.once("moveend", function () { ajustando = false; });
+    }
+  }
+  function cerrarPopup() { if (popupAbierto) popupAbierto.remove(); }
+
+  // Desplazamientos de la tarjeta según hacia dónde se abra (MapLibre elige el lado que cabe)
+  var OFFSET = {
+    "top": [0, 6], "top-left": [14, 6], "top-right": [-14, 6],
+    "bottom": [0, -58], "bottom-left": [14, -52], "bottom-right": [-14, -52],
+    "left": [28, -30], "right": [-28, -30]
+  };
 
   function crearMarcador(l, retraso) {
     var c = cat(l);
-    var ic = L.divIcon({
-      className: "marcador",
-      html: '<div class="pin" style="--c:' + c.color + ';--d:' + retraso + 'ms"><span>' + icono(l) + "</span></div>",
-      iconSize: [46, 46], iconAnchor: [4, 50], popupAnchor: [20, -46]
-    });
-    var m = L.marker(l.coordenadas, { icon: ic, title: l.nombre, alt: l.nombre, riseOnHover: true, keyboard: true });
-    m.bindPopup(tarjetaHTML(l), { className: "tarjeta-popup", closeButton: !conRaton, autoPan: true, autoPanPadding: [16, 16], maxWidth: 300, minWidth: 280 });
+    var el = document.createElement("div");
+    el.className = "marcador";
+    el.tabIndex = 0;
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", l.nombre);
+    el.title = conRaton ? "" : l.nombre;
+    el.innerHTML = '<div class="pin" style="--c:' + c.color + ';--d:' + retraso + 'ms"><span>' + icono(l) + "</span></div>";
+
+    var marker = new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat(ll(l.coordenadas)).addTo(mapa);
+    var popup = new maplibregl.Popup({
+      className: "tarjeta-popup", closeButton: !conRaton, closeOnClick: true, closeOnMove: false,
+      focusAfterOpen: false, maxWidth: "300px", offset: OFFSET
+    }).setHTML(tarjetaHTML(l));
 
     var temporizador = null;
-    function cerrarPronto() { temporizador = setTimeout(function () { m.closePopup(); }, 350); }
+    function cerrarPronto() {
+      clearTimeout(temporizador);
+      temporizador = setTimeout(function () { if (!ajustando) popup.remove(); }, 350);
+    }
     function mantener() { clearTimeout(temporizador); }
 
-    if (conRaton) {
-      // Ordenador: la tarjeta se abre solo con pasar el ratón por encima
-      m.on("mouseover", function () { mantener(); m.openPopup(); });
-      m.on("mouseout", cerrarPronto);
-      m.on("click", function () { abrirFicha(l.id); });
-    }
-    m.on("popupopen", function (e) {
+    function abrir() {
+      mantener();
+      if (popup.isOpen()) return;
+      cerrarPopup();
+      popup.setLngLat(ll(l.coordenadas)).addTo(mapa);
+      popupAbierto = popup;
       marcarActivo(l.id);
-      var el = e.popup.getElement();
-      if (!el) return;
-      el.onmouseenter = mantener;
-      el.onmouseleave = conRaton ? cerrarPronto : null;
-      var t = el.querySelector("[data-abrir]");
+      requestAnimationFrame(function () { asegurarVisible(popup); });
+      var pe = popup.getElement();
+      pe.addEventListener("mouseenter", mantener);
+      if (conRaton) pe.addEventListener("mouseleave", cerrarPronto);
+      var t = pe.querySelector("[data-abrir]");
       if (t) {
-        t.onclick = function () { abrirFicha(l.id); };
-        t.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); abrirFicha(l.id); } };
+        t.addEventListener("click", function () { abrirFicha(l.id); });
+        t.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); abrirFicha(l.id); } });
       }
+    }
+    popup.on("close", function () {
+      if (popupAbierto === popup) popupAbierto = null;
+      if (activo === l.id) marcarActivo(null);
     });
-    m.on("popupclose", function () { if (activo === l.id) marcarActivo(null); });
-    m.on("keypress", function (ev) { if (ev.originalEvent.key === "Enter") abrirFicha(l.id); });
-    return m;
+
+    if (conRaton) {
+      // Ordenador: la tarjeta se abre solo con pasar el ratón por encima; clic = ficha completa
+      el.addEventListener("mouseenter", abrir);
+      el.addEventListener("mouseleave", cerrarPronto);
+      el.addEventListener("click", function (e) { e.stopPropagation(); abrirFicha(l.id); });
+    } else {
+      // Móvil: primer toque abre la tarjeta; tocar la tarjeta abre la ficha
+      el.addEventListener("click", function (e) { e.stopPropagation(); abrir(); });
+    }
+    el.addEventListener("focus", abrir);
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter") abrirFicha(l.id); });
+
+    return { abrir: abrir, quitar: function () { popup.remove(); marker.remove(); }, lngLat: ll(l.coordenadas), el: el };
   }
 
   function marcarActivo(id) {
     if (activo && elemLista[activo]) elemLista[activo].classList.remove("activo");
+    if (activo && marcadores[activo]) marcadores[activo].el.classList.remove("activo");
     activo = id;
     if (id && elemLista[id]) elemLista[id].classList.add("activo");
+    if (id && marcadores[id]) marcadores[id].el.classList.add("activo");
   }
 
   /* ---------- Filtrado ---------- */
@@ -164,14 +229,13 @@
     return true;
   }
 
-  function pintar(ajustarVista) {
+  function pintar(ajustarVista, sinAnimacion) {
     var visibles = LUGARES.filter(coincide).sort(function (a, b) { return a.nombre.localeCompare(b.nombre, "es"); });
-    capa.clearLayers();
+    Object.keys(marcadores).forEach(function (id) { marcadores[id].quitar(); });
     marcadores = {};
     visibles.forEach(function (l, i) {
       var m = crearMarcador(l, Math.min(i * 45, 900));
       marcadores[l.id] = m;
-      capa.addLayer(m);
     });
 
     // Lista
@@ -189,7 +253,7 @@
         '<span class="item-texto"><span class="item-nombre">' + esc(l.nombre) + "</span>" +
         '<span class="item-detalle">' + esc(c.nombre) + (l.direccion ? " · " + esc(l.direccion) : "") + "</span></span>";
       b.addEventListener("click", function () { enfocar(l.id); });
-      b.addEventListener("mouseenter", function () { if (conRaton && marcadores[l.id]) marcadores[l.id].openPopup(); });
+      b.addEventListener("mouseenter", function () { if (conRaton && marcadores[l.id]) marcadores[l.id].abrir(); });
       li.appendChild(b);
       ul.appendChild(li);
       elemLista[l.id] = b;
@@ -201,16 +265,18 @@
       visibles.length === 1 ? "1 lugar encontrado" : visibles.length + " lugares encontrados";
 
     if (ajustarVista && visibles.length) {
-      var b2 = L.latLngBounds(visibles.map(function (l) { return l.coordenadas; }));
-      mapa.flyToBounds(b2, { padding: [60, 60], maxZoom: 17, duration: .6 });
+      var b2 = new maplibregl.LngLatBounds();
+      visibles.forEach(function (l) { b2.extend(ll(l.coordenadas)); });
+      mapa.fitBounds(b2, { padding: { top: 90, bottom: 50, left: 50, right: 50 }, maxZoom: 16, duration: sinAnimacion ? 0 : 700 });
     }
   }
 
   function enfocar(id) {
     var m = marcadores[id];
     if (!m) return;
-    mapa.flyTo(m.getLatLng(), Math.max(mapa.getZoom(), 17), { duration: .5 });
-    mapa.once("moveend", function () { m.openPopup(); });
+    cerrarPopup();
+    mapa.flyTo({ center: m.lngLat, zoom: Math.max(mapa.getZoom(), 16), offset: [0, 120], duration: 600 });
+    mapa.once("moveend", function () { m.abrir(); });
     if (window.innerWidth <= 860) document.getElementById("mapa").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -273,7 +339,7 @@
     input.value = ""; borrar.hidden = true; estado.texto = ""; pintar(true); input.focus();
   });
   document.getElementById("btn-centrar").addEventListener("click", function () {
-    mapa.closePopup(); pintar(true);
+    cerrarPopup(); pintar(true);
   });
 
   /* ---------- Ficha completa (landing) ---------- */
@@ -339,7 +405,7 @@
   function mostrarFicha(id) {
     var l = LUGARES.filter(function (x) { return x.id === id; })[0];
     if (!l) return cerrarFicha(true);
-    mapa.closePopup();
+    cerrarPopup();
     if (ficha.hidden) focoPrevio = document.activeElement;
     ficha.innerHTML = fichaHTML(l);
     ficha.hidden = false; fondo.hidden = false;
@@ -388,6 +454,6 @@
   document.getElementById("aviso-ejemplo").hidden = !LUGARES.some(function (l) { return l.ejemplo; });
   pintarPestanas();
   pintarChips();
-  pintar(false);
+  pintar(true, true);
   leerHash();
 })();
