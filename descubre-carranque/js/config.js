@@ -10,6 +10,13 @@ window.CONFIG = {
   titulo: "Descubre Carranque",
   subtitulo: "Comercios, asociaciones y cultura de Carranque (Toledo)",
 
+  // ---- Conexión con Supabase (zona de gestión) ----
+  // Se copian de Supabase → Project Settings → API.
+  // Mientras estén vacíos, la web usa los datos de js/datos.js
+  // (La "anon key" es pública por diseño: la seguridad la ponen los permisos de la base de datos.)
+  supabaseUrl: "",
+  supabaseAnonKey: "",
+
   // Dirección pública de la web. Es la que se codifica en el QR.
   // ¡Una vez impreso el QR, esta dirección NO debe cambiar!
   urlPublica: "https://oscarfurio.github.io/descubre-carranque/",

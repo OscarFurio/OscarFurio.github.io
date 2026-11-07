@@ -8,7 +8,12 @@
   var CFG = window.CONFIG;
   var CATS = {};
   window.CATEGORIAS.forEach(function (c) { CATS[c.id] = c; });
-  var LUGARES = window.LUGARES.filter(function (l) { return l && l.id && l.coordenadas; });
+  var LUGARES = [];   // se rellena al arrancar (desde Supabase o desde js/datos.js)
+  function validos(lista) {
+    return lista.filter(function (l) {
+      return l && l.id && l.coordenadas && isFinite(l.coordenadas[0]) && isFinite(l.coordenadas[1]);
+    });
+  }
 
   var DIAS = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"];
   var NOMBRE_DIA = { lun: "Lunes", mar: "Martes", mie: "Miércoles", jue: "Jueves", vie: "Viernes", sab: "Sábado", dom: "Domingo" };
@@ -451,9 +456,19 @@
   /* ---------- Arranque ---------- */
   document.getElementById("titulo-texto").textContent = CFG.titulo;
   document.getElementById("subtitulo-texto").textContent = CFG.subtitulo;
-  document.getElementById("aviso-ejemplo").hidden = !LUGARES.some(function (l) { return l.ejemplo; });
   pintarPestanas();
-  pintarChips();
-  pintar(true, true);
-  leerHash();
+  document.getElementById("contador").textContent = "Cargando…";
+
+  window.FuenteDatos.cargarLugares().then(function (lista) {
+    LUGARES = validos(lista);
+    document.getElementById("aviso-ejemplo").hidden = !LUGARES.some(function (l) { return l.ejemplo; });
+    pintarChips();
+    pintar(true, true);
+    leerHash();
+  }).catch(function (err) {
+    console.error(err);
+    document.getElementById("contador").textContent = "";
+    document.getElementById("lista").innerHTML =
+      '<li class="vacio">No se han podido cargar los datos en este momento.<br>Inténtalo de nuevo en unos minutos.</li>';
+  });
 })();
